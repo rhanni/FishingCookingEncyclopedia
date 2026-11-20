@@ -1,0 +1,11 @@
+# Normalize line endings so Windows and Mac checkouts match.
+* text=auto
+*.lua text eol=lf
+*.toc text eol=lf
+*.md text eol=lf
+
+# Binary files
+*.tga binary
+*.blp binary
+*.png binary
+*.zip binary

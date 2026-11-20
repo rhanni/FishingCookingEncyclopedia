@@ -1,0 +1,10 @@
+package-as: FishingCookingEncyclopedia
+
+# Dev-only folders and files stay out of the release package.
+ignore:
+  - tools
+  - research
+  - docs
+  - README.md
+  - .gitignore
+  - .gitattributes

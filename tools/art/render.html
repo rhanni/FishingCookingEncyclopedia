@@ -1,0 +1,40 @@
+<!doctype html><meta charset="utf-8"><title>Icon render</title>
+<body style="background:#222;color:#ddd;font:13px sans-serif">
+<p>Renders TabIcon.svg to a 64x64 32-bit TGA (bottom-left origin). Serve with art_server.py, then run saveIcon().</p>
+<canvas id="c" width="64" height="64" style="width:256px;height:256px;image-rendering:pixelated"></canvas>
+<canvas id="small" width="64" height="64" style="width:36px;height:36px"></canvas>
+<pre id="out">rendering...</pre>
+<script>
+(async () => {
+  const svgText = await (await fetch("TabIcon.svg")).text();
+  const url = URL.createObjectURL(new Blob([svgText], { type: "image/svg+xml" }));
+  const img = new Image();
+  img.onload = () => {
+    const c = document.getElementById("c"), ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0, 64, 64);
+    document.getElementById("small").getContext("2d").drawImage(img, 0, 0, 64, 64);
+    const px = ctx.getImageData(0, 0, 64, 64).data;
+    const W = 64, H = 64, bytes = new Uint8Array(18 + W * H * 4);
+    bytes[2] = 2;                    // uncompressed true-color
+    bytes[12] = W; bytes[14] = H;    // width/height (little-endian, < 256)
+    bytes[16] = 32;                  // bits per pixel
+    bytes[17] = 0x08;                // 8 alpha bits, bottom-left origin
+    let o = 18;
+    for (let y = H - 1; y >= 0; y--) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        bytes[o++] = px[i + 2]; bytes[o++] = px[i + 1]; bytes[o++] = px[i]; bytes[o++] = px[i + 3];
+      }
+    }
+    window.tgaBytes = bytes;
+    document.getElementById("out").textContent = "ready: " + bytes.length + " bytes. Call saveIcon() to write Media/TabIcon.tga.";
+    window.saveIcon = async () => {
+      const r = await fetch("/save/TabIcon.tga", { method: "POST", body: bytes });
+      const msg = await r.text();
+      document.getElementById("out").textContent = msg;
+      return msg;
+    };
+  };
+  img.src = url;
+})();
+</script>

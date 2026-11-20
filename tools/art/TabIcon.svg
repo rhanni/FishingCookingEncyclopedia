@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Fishing & Cooking Encyclopedia tab icon, concept A "Angler's codex".
+       Full-bleed art: Blizzard's side-tab template draws its own frame. -->
+  <rect x="0" y="0" width="64" height="64" fill="#123a4a"/>
+  <circle cx="34" cy="26" r="21" fill="#1d5568"/>
+  <circle cx="34" cy="24" r="11" fill="#256a80" opacity="0.6"/>
+  <!-- bobber and line -->
+  <path d="M50 0 L50 14.5" stroke="#cfd8dc" stroke-width="0.9"/>
+  <circle cx="50" cy="18" r="3.8" fill="#f2efe6"/>
+  <path d="M46.2 18 a3.8 3.8 0 0 1 7.6 0z" fill="#c8352a"/>
+  <circle cx="48.7" cy="16.4" r="0.9" fill="#ffffff" opacity="0.8"/>
+  <!-- leaping fish -->
+  <path d="M17 33 Q30 15 46 21 Q35 35 17 33Z" fill="#8cc4d6"/>
+  <path d="M22 31 Q32 27 43 23 Q35 33 22 31Z" fill="#c9e7ef"/>
+  <path d="M24 26 Q31 18 40 19 Q32 22 26 28Z" fill="#4f8ea3"/>
+  <path d="M28 21.5 L31 16 L34 20.5Z" fill="#5d97ab"/>
+  <path d="M17 33 L8 27 L11 34 L7 41Z" fill="#5d97ab"/>
+  <circle cx="42" cy="22.5" r="1.6" fill="#0d1a20"/>
+  <circle cx="42.5" cy="22" r="0.5" fill="#ffffff"/>
+  <!-- splash droplets -->
+  <circle cx="14" cy="40" r="1.1" fill="#9fd2e3"/>
+  <circle cx="19" cy="42" r="0.8" fill="#9fd2e3"/>
+  <!-- open book -->
+  <path d="M7 47 L32 52 L57 47 L57 56 L32 60 L7 56Z" fill="#5a3418"/>
+  <path d="M7 55 L32 59 L57 55" stroke="#c9a24a" stroke-width="0.8" fill="none"/>
+  <path d="M9 44 Q21 40 32 47 L32 53 Q21 47 9 50Z" fill="#efdcae"/>
+  <path d="M55 44 Q43 40 32 47 L32 53 Q43 47 55 50Z" fill="#dcc48c"/>
+  <path d="M13 45.5 Q21 43 29 47 M13 48 Q21 45.5 29 49.5 M35 47 Q43 43 51 45.5 M35 49.5 Q43 45.5 51 48" stroke="#8a6a3a" stroke-width="0.7" fill="none"/>
+  <path d="M32 47 L32 53" stroke="#3a2210" stroke-width="1"/>
+  <!-- Blizzard-style bevel -->
+  <rect x="0.5" y="0.5" width="63" height="63" fill="none" stroke="#000000" stroke-opacity="0.85" stroke-width="1"/>
+  <rect x="1.5" y="1.5" width="61" height="61" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1"/>
+</svg>
