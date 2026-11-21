@@ -156,11 +156,11 @@ end
 -- Side tab
 ---------------------------------------------------------------------------
 
-local function createSideTab(PF)
-	local ok, tab = pcall(CreateFrame, "Frame", "FCE_ProfessionSideTab", PF, "LargeSideTabButtonTemplate")
+local function createSideTab(parent)
+	local ok, tab = pcall(CreateFrame, "Frame", "FCE_ProfessionSideTab", parent, "LargeSideTabButtonTemplate")
 	if not ok or not tab then
 		-- Fallback if the template isn't available: a plain icon button.
-		tab = CreateFrame("Button", "FCE_ProfessionSideTab", PF)
+		tab = CreateFrame("Button", "FCE_ProfessionSideTab", parent)
 		tab:SetSize(44, 44)
 		tab.Icon = tab:CreateTexture(nil, "ARTWORK")
 		tab.Icon:SetAllPoints()
@@ -193,10 +193,32 @@ local function createSideTab(PF)
 	return tab
 end
 
--- Other addons (e.g. AllTheThings) also put side tabs under Blizzard's.
--- We stack ours below the lowest of them instead of overlapping it.
-local TAB_GAP = 14   -- gap between Blizzard's last tab and the first addon tab
-local STACK_GAP = 4  -- gap below another addon's tab
+-- Tab placement. Other addons add side tabs under Blizzard's too, and two
+-- addons that each stack below whatever is already there can chase each other
+-- off screen. So this tab never reacts to other tabs: by default it is pinned
+-- to the bottom of the window's tab column, a fixed spot that tabs stacked from
+-- the top won't reach. The "top" setting puts it under Blizzard's last tab.
+--
+-- The column is a shared frame, ProfessionsFrameTabSideBar. AllTheThings
+-- creates it (if no other addon has), moves Blizzard's tabs onto it, and
+-- re-anchors it to the edge of its own window when that opens. Our tab is
+-- parented and anchored to the same frame so it moves with the other tabs.
+local TAB_GAP = 14
+local TAB_BOTTOM_INSET = 24
+
+local function getSideBar(PF)
+	local bar = _G.ProfessionsFrameTabSideBar
+	if not bar then
+		bar = CreateFrame("Frame", nil, PF)
+		bar:SetWidth(1)
+		bar:SetPoint("TOPLEFT", PF, "TOPRIGHT")
+		bar:SetPoint("BOTTOMLEFT", PF, "BOTTOMRIGHT")
+		bar.Tabs = {}
+		bar.selTab = 0
+		_G.ProfessionsFrameTabSideBar = bar
+	end
+	return bar
+end
 
 local function lastBlizzardTab(PF)
 	local last = PF.ProfessionsOverviewTab
@@ -206,192 +228,28 @@ local function lastBlizzardTab(PF)
 	return last
 end
 
-local function isBlizzardTab(PF, f)
-	if f == PF.ProfessionsOverviewTab then return true end
-	for _, t in ipairs(PF.rightProfessionTabs or {}) do
-		if t == f then return true end
-	end
-	return false
-end
-
--- True if f is positioned relative to our tab (it would move with us, so
--- stacking below it would chase it forever).
-local function anchoredTo(f, target)
-	local n = f.GetNumPoints and f:GetNumPoints() or 0
-	for i = 1, n do
-		local _, rel = f:GetPoint(i)
-		if rel == target then return true end
-	end
-	return false
-end
-
--- The retail-based client protects some frames (nameplates, secure unit
--- frames): reading their position can error or return "secret" values that
--- can't be compared. Anything like that is skipped, never trusted.
-local function plainNumber(v)
-	return type(v) == "number" and not (issecretvalue and issecretvalue(v))
-end
-
--- Returns f's bottom edge (in `last`'s coordinates) if f looks like another
--- addon's side tab in Blizzard's tab column below `last`; otherwise nil.
--- Runs inside pcall, so any error just means "not a tab".
-local function foreignTabBottom(PF, f, colLeft, lastBottom, lastScale)
-	if f == UI.tab or f == UI.panel then return nil end
-	if f.IsForbidden and f:IsForbidden() then return nil end
-	if f.IsAnchoringRestricted and f:IsAnchoringRestricted() then return nil end
-	if not f.IsVisible or not f:IsVisible() then return nil end
-	local l, b, w, h = f:GetRect()
-	local scale = f:GetEffectiveScale()
-	if not (plainNumber(l) and plainNumber(b) and plainNumber(w) and plainNumber(h) and plainNumber(scale)) then return nil end
-	local s = scale / lastScale
-	l, b, w, h = l * s, b * s, w * s, h * s
-	if w < 24 or w > 80 or h < 24 or h > 80 then return nil end -- not tab-sized
-	if math.abs(l - colLeft) > 12 then return nil end            -- not in the tab column
-	if b + h > lastBottom + 4 then return nil end                -- not below Blizzard's tabs
-	if isBlizzardTab(PF, f) or anchoredTo(f, UI.tab) then return nil end
-	return b
-end
-
--- Performance: we never scan the whole UI when the window opens.
---   * Other addons' tabs, once found, are remembered (foreignTabs) and their
---     OnShow/OnHide are hooked, so we re-stack the moment they appear or
---     disappear instead of polling.
---   * Each re-stack only checks those remembered tabs plus the profession
---     window's direct children (a few dozen frames).
---   * A full search of every frame (for tabs parented elsewhere) runs once
---     per session, spread over many frames so it never causes a hitch.
---   * Repeated requests in the same frame collapse into one re-stack, and
---     nothing runs while the window is closed.
-local foreignTabs = setmetatable({}, { __mode = "k" }) -- [frame] = true
-local watched = setmetatable({}, { __mode = "k" })
-local scheduleReanchor -- defined below
-
--- Position of Blizzard's tab column, or nil if it can't be read yet.
-local function columnInfo(last)
-	local l, b, s = last:GetLeft(), last:GetBottom(), last:GetEffectiveScale()
-	if plainNumber(l) and plainNumber(b) and plainNumber(s) and s ~= 0 then
-		return { left = l, bottom = b, scale = s }
-	end
-end
-
--- Checks one frame; remembers and watches it if it's another addon's tab.
--- Returns its bottom edge, or nil.
-local function checkFrame(PF, f, col)
-	local ok, b = pcall(foreignTabBottom, PF, f, col.left, col.bottom, col.scale)
-	if not ok or not b then return nil end
-	foreignTabs[f] = true
-	if not watched[f] then
-		watched[f] = true
-		pcall(f.HookScript, f, "OnShow", function() scheduleReanchor() end)
-		pcall(f.HookScript, f, "OnHide", function() scheduleReanchor() end)
-	end
-	return b
-end
-
--- Lowest other-addon tab, as a (negative) offset from the bottom of
--- Blizzard's last tab; nil if there are none.
-local function lowestForeignTabOffset(PF, last)
-	local col = columnInfo(last)
-	if not col then return nil end
-	local lowest
-	local function consider(f)
-		local b = checkFrame(PF, f, col)
-		if b and (not lowest or b < lowest) then lowest = b end
-	end
-	for f in pairs(foreignTabs) do consider(f) end
-	for _, f in ipairs({ PF:GetChildren() }) do consider(f) end
-	return lowest and (lowest - col.bottom) or nil
-end
-
 local function reanchorTab()
 	local PF = ProfessionsFrame
 	local tab = UI.tab
 	if not PF or not tab then return end
-	local last = lastBlizzardTab(PF)
-	-- Work out the offset first, so the tab is never left without a position.
-	local y = -TAB_GAP
-	if last and PF:IsShown() then
-		local ok, foreign = pcall(lowestForeignTabOffset, PF, last)
-		if ok and foreign then y = math.min(y, foreign - STACK_GAP) end
-	end
 	tab:ClearAllPoints()
-	if last then
-		tab:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, y)
+	if ns.db.settings.tabPosition == "top" then
+		local last = lastBlizzardTab(PF)
+		if last then
+			tab:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, -TAB_GAP)
+		else
+			tab:SetPoint("TOPLEFT", PF, "TOPRIGHT", 0, -36)
+		end
 	else
-		tab:SetPoint("TOPLEFT", PF, "TOPRIGHT", 0, -36)
+		tab:SetPoint("BOTTOMLEFT", UI.sideBar or PF, UI.sideBar and "BOTTOMLEFT" or "BOTTOMRIGHT", 0, TAB_BOTTOM_INSET)
 	end
 	tab:Show()
 end
-UI.ReanchorTab = reanchorTab -- for tests / debugging
+UI.ReanchorTab = reanchorTab
 
--- Collapse any number of requests in one frame into a single re-stack on the
--- next frame (when other addons have finished creating/moving their tabs).
-local reanchorPending = false
-scheduleReanchor = function()
-	if reanchorPending then return end
-	reanchorPending = true
-	C_Timer.After(0, function()
-		reanchorPending = false
-		if ProfessionsFrame and ProfessionsFrame:IsShown() then reanchorTab() end
-	end)
-end
-
--- Full search for tabs parented outside the profession window. Runs once per
--- session, 200 frames per rendered frame. sync=true does it all at once
--- (for /fce tabs and tests).
-local FRAMES_PER_STEP = 200
-local deepScanDone, deepScanner = false, nil
-
-local function deepScanStep(budget)
-	local PF = ProfessionsFrame
-	local last = PF and PF:IsShown() and lastBlizzardTab(PF)
-	local col = last and columnInfo(last)
-	if not col then return "paused" end
-	local f = deepScanner.cursor
-	for _ = 1, budget do
-		if not f then return "done" end
-		checkFrame(PF, f, col)
-		f = EnumerateFrames(f)
-	end
-	deepScanner.cursor = f
-	return f and "more" or "done"
-end
-
-function UI:FindAddonTabs(sync)
-	if not EnumerateFrames or (deepScanDone and not sync) then return end
-	deepScanner = deepScanner or CreateFrame("Frame")
-	deepScanner.cursor = EnumerateFrames()
-	local function finish(result)
-		deepScanner:SetScript("OnUpdate", nil)
-		if result == "done" then deepScanDone = true; scheduleReanchor() end
-		-- "paused": window closed mid-search; it restarts next time it opens.
-	end
-	if sync then
-		finish(deepScanStep(math.huge))
-		return
-	end
-	deepScanner:SetScript("OnUpdate", function()
-		local result = deepScanStep(FRAMES_PER_STEP)
-		if result ~= "more" then finish(result) end
-	end)
-end
-
--- /fce tabs: list the other addons' tabs we're stacking below.
-function UI:ReportTabs()
-	if not ProfessionsFrame or not ProfessionsFrame:IsShown() then
-		return ns:Print("Open the profession window first, then type /fce tabs.")
-	end
-	self:FindAddonTabs(true)
+function UI:SetTabPosition(position)
+	ns.db.settings.tabPosition = position == "top" and "top" or "bottom"
 	reanchorTab()
-	local n = 0
-	for f in pairs(foreignTabs) do
-		local ok, l, b, w, h = pcall(f.GetRect, f)
-		local name = (f.GetName and f:GetName()) or (f.GetParent and f:GetParent() and f:GetParent():GetName() and (f:GetParent():GetName() .. " child")) or "unnamed frame"
-		n = n + 1
-		ns:Print(("Other addon tab: %s%s"):format(name,
-			ok and plainNumber(l) and (" at %d,%d size %dx%d%s"):format(l, b, w, h, f:IsVisible() and "" or " (hidden)") or ""))
-	end
-	if n == 0 then ns:Print("No other addons' side tabs found in the profession window.") end
 end
 
 local function deselect()
@@ -421,22 +279,18 @@ local function setup()
 	if not PF or UI.panel then return end
 
 	UI.panel = createPanel(PF)
-	UI.tab = createSideTab(PF)
+	UI.sideBar = getSideBar(PF)
+	UI.tab = createSideTab(UI.sideBar)
 
-	-- Keep our tab beneath Blizzard's as their visibility changes.
-	if PF.RefreshRightTabs then hooksecurefunc(PF, "RefreshRightTabs", scheduleReanchor) end
+	-- Re-place our tab when Blizzard's tabs change (matters for the "top" position).
+	if PF.RefreshRightTabs then hooksecurefunc(PF, "RefreshRightTabs", reanchorTab) end
 	-- Any Blizzard tab or page selection hides our panel.
 	if PF.RightTabSelected then hooksecurefunc(PF, "RightTabSelected", deselect) end
 	if PF.SelectBookPage then hooksecurefunc(PF, "SelectBookPage", deselect) end
 	-- Reopening the window always starts on Blizzard's page.
-	-- On open: place the tab now, re-check once next frame (other addons add
-	-- their tabs in their own OnShow), and on the first open of the session
-	-- start the spread-out search for tabs parented elsewhere.
 	PF:HookScript("OnShow", function()
 		deselect()
 		reanchorTab()
-		scheduleReanchor()
-		UI:FindAddonTabs(false)
 	end)
 
 	reanchorTab()

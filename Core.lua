@@ -33,6 +33,7 @@ local DEFAULTS = {
 		cookingUnknownOnly = false, -- Cooking page: show only recipes you don't know
 		cookingBenefits = {},      -- Cooking page: [benefit key] = true (union filter)
 		rowStyle = "A",            -- alternating row style: "A", "B" or "C"
+		tabPosition = "bottom",    -- profession window tab: "bottom" of the tab column, or "top" (under Blizzard's tabs)
 		collapsedTiers = {},       -- [tier label] = true when collapsed on the Fishing page
 	},
 	prices = {},                   -- [realmKey][itemID] = { last = {...}, history = {...} }
@@ -192,8 +193,13 @@ commands.reset = function(arg)
 	ns:Print("Price data for this realm wiped.")
 end
 
-commands.tabs = function()
-	if ns.UI and ns.UI.ReportTabs then ns.UI:ReportTabs() end
+commands.tab = function(arg)
+	arg = (arg or ""):lower()
+	if arg == "top" or arg == "bottom" then
+		if ns.UI and ns.UI.SetTabPosition then ns.UI:SetTabPosition(arg) end
+	end
+	ns:Print("Profession window tab position:", ns.db.settings.tabPosition,
+		"(use /fce tab top or /fce tab bottom to change it)")
 end
 
 commands.help = function()
@@ -204,7 +210,7 @@ commands.help = function()
 	print("  /fce autoscan [on|off] - toggle auto-scan when the AH opens (now " .. onOff(ns.db.settings.autoScan) .. ")")
 	print("  /fce price <item> - show stored price for an item")
 	print("  /fce reset prices - wipe stored prices for this realm")
-	print("  /fce tabs - list other addons' profession side tabs we stack below")
+	print("  /fce tab [top|bottom] - where our tab sits in the profession window (now " .. ns.db.settings.tabPosition .. ")")
 end
 
 SLASH_FISHINGCOOKINGENCYCLOPEDIA1 = "/fce"

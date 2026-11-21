@@ -26,7 +26,7 @@ Copy the `FishingCookingEncyclopedia` folder into the game's AddOns folder for t
 | `/fce autoscan [on\|off]` | Toggle scanning when the auction house opens |
 | `/fce price <item>` | Show the stored price for an item |
 | `/fce reset prices` | Wipe stored prices for this realm |
-| `/fce tabs` | List other addons' profession tabs this one stacks below |
+| `/fce tab [top\|bottom]` | Where the addon's tab sits in the profession window (default: bottom) |
 
 ## Repository layout
 

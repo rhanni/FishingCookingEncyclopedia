@@ -41,6 +41,17 @@ local function step(label, fn, ...)
   return ok
 end
 
+local attBar
+if ATT_FIRST then
+  attBar = CreateFrame("Frame", nil, ProfessionsFrame)
+  attBar:SetWidth(1)
+  attBar:SetPoint("TOPLEFT", ProfessionsFrame, "TOPRIGHT")
+  attBar:SetPoint("BOTTOMLEFT", ProfessionsFrame, "BOTTOMRIGHT")
+  attBar.Tabs = {}
+  attBar.selTab = 0
+  attBar.__marker = "AllTheThings"
+  ProfessionsFrameTabSideBar = attBar
+end
 step("ADDON_LOADED", M.fire, "ADDON_LOADED", "FishingCookingEncyclopedia")
 local D = ns.Data
 say(("Data: %d zones, %d recipes, %d scan items"):format(#D.zones, #D.recipes, #D:GetScanItemIDs()))
@@ -48,66 +59,53 @@ say(("Data: %d zones, %d recipes, %d scan items"):format(#D.zones, #D.recipes, #
 step("open tab (/fce)", function() SlashCmdList.FISHINGCOOKINGENCYCLOPEDIA("") end)
 say("Panel shown after /fce: " .. tostring(ns.UI.panel and ns.UI.panel:IsShown()) .. ", page: " .. tostring(ns.UI.currentPage))
 
-step("side tab stacking", function()
+step("side tab placement", function()
   local PF = ProfessionsFrame
-  local last = PF.rightProfessionTabs[#PF.rightProfessionTabs]
-  M.setRect(last, 800, 500, 40, 40)
-  local function y() M.flush(); local _, rel, _, _, oy = ns.UI.tab:GetPoint(1); return oy, rel == last end
-  ns.UI.ReanchorTab()
-  local alone, relOk = y()
-  -- Another addon's tab parented to UIParent, 14px below Blizzard's (where ours used to go).
-  local other = CreateFrame("Button", nil, UIParent)
-  M.setRect(other, 801, 446, 40, 40)
-  -- Noise: anchored to our tab (moves with us), too wide, wrong column,
-  -- and protected frames (geometry errors, or "secret" values).
-  local follower = CreateFrame("Button")
-  follower:SetPoint("TOP", ns.UI.tab, "BOTTOM", 0, -4)
-  M.setRect(follower, 800, 300, 40, 40)
-  local wide = CreateFrame("Frame"); M.setRect(wide, 800, 200, 300, 40)
-  local offcol = CreateFrame("Frame"); M.setRect(offcol, 600, 200, 40, 40)
-  local hostile = CreateFrame("Frame"); hostile.GetRect = function() error("blocked: protected frame") end
-  local secretRect = CreateFrame("Frame"); M.setRect(secretRect, 800, 100, 40, 40)
-  issecretvalue = function(v) return v == 100 end
-
-  ns.UI.ReanchorTab()
-  local beforeDeep = y() -- not a profession-window child, so cheap checks can't see it yet
-
-  -- Spread-out full search (as on first window open): drive OnUpdate frames.
-  local steps = 0
-  ns.UI:FindAddonTabs(false)
-  for _ = 1, 10000 do
-    local ran = false
-    for _, o in ipairs(M.all) do
-      local fn = o.__scripts.OnUpdate
-      if fn then fn(o, 0.016); ran = true end
-    end
-    if not ran then break end
-    steps = steps + 1
+  local bar = ProfessionsFrameTabSideBar
+  local function where()
+    local p, rel, relp, x, y = ns.UI.tab:GetPoint(1)
+    local what = rel == bar and "shared sidebar" or (rel == PF and "ProfessionsFrame" or "other frame")
+    return ("%s -> %s of %s, offset %s,%s"):format(tostring(p), tostring(relp), what, tostring(x), tostring(y))
   end
-  local afterDeep = y()
-  issecretvalue = nil
-  say(("Side tab: alone=%s (on Blizzard tab: %s), UIParent tab before full search=%s, after=%s (search took %d frames for %d frames total)"):format(
-    tostring(alone), tostring(relOk), tostring(beforeDeep), tostring(afterDeep), steps, #M.all))
+  say(("Shared sidebar: exists=%s, created by %s, reused (not replaced)=%s, tab is its child=%s, left Tabs registry untouched=%s"):format(
+    tostring(bar ~= nil), bar and (bar.__marker or "this addon") or "nobody",
+    tostring(attBar == nil or bar == attBar), tostring(ns.UI.tab:GetParent() == bar), tostring(bar and #bar.Tabs == 0)))
+  ns.UI.ReanchorTab()
+  local base = where()
+  say("Tab placement (default): " .. base)
 
-  -- A tab parented to the profession window is found by the cheap check.
-  local child = CreateFrame("Button", nil, ProfessionsFrame); M.setRect(child, 800, 400, 40, 40)
+  -- The other addon's window opens: it re-anchors the sidebar to its own edge.
+  local attWindow = CreateFrame("Frame", nil, PF); M.setRect(attWindow, 900, 0, 350, 700)
+  bar:ClearAllPoints()
+  bar:SetPoint("TOPLEFT", attWindow, "TOPRIGHT")
+  bar:SetPoint("BOTTOMLEFT", attWindow, "BOTTOMRIGHT")
+  ns.UI.ReanchorTab()
+  PF:Hide(); PF:Show()
+  local _, barTarget = bar:GetPoint(1)
+  say(("Sidebar moved to the other window's edge (target is that window: %s); tab still follows it: %s"):format(
+    tostring(barTarget == attWindow), tostring(where() == base)))
+  bar:ClearAllPoints()
+  bar:SetPoint("TOPLEFT", PF, "TOPRIGHT")
+  bar:SetPoint("BOTTOMLEFT", PF, "BOTTOMRIGHT")
+
+  -- Other addons' tabs, hostile frames and secret values must change nothing.
+  local other = CreateFrame("Button", nil, UIParent); M.setRect(other, 801, 446, 40, 40)
+  local hostile = CreateFrame("Frame"); hostile.GetRect = function() error("blocked: protected frame") end
   M.rectCalls = 0
   ns.UI.ReanchorTab()
-  local withChild, cost = y(), M.rectCalls
-  -- Hiding a known tab re-stacks via its OnHide hook, with no explicit call.
-  child:Hide(); M.flush()
-  local afterHideHook = y()
-  other:Hide(); M.flush()
-  local allHidden = y()
-  say(("Side tab: PF child tab=%s (cheap re-stack read %d frames), child hidden via hook=%s, all hidden=%s"):format(
-    tostring(withChild), cost, tostring(afterHideHook), tostring(allHidden)))
+  PF:Show(); PF:Hide(); PF:Show()
+  local ticking = 0
+  for _, o in ipairs(M.all) do if o.__scripts.OnUpdate then ticking = ticking + 1 end end
+  say(("With other tabs present: unchanged=%s, frames inspected=%d, frames hooked=%s, OnUpdate frames=%d"):format(
+    tostring(where() == base), M.rectCalls, tostring(other.__scripts.OnShow ~= nil or other.__scripts.OnHide ~= nil), ticking))
+  other:Hide(); hostile:Hide()
 
-  -- /fce tabs
-  other:Show(); M.flush()
-  local n0 = #M.printed
-  SlashCmdList.FISHINGCOOKINGENCYCLOPEDIA("tabs")
-  for i = n0 + 1, #M.printed do say("  /fce tabs: " .. M.printed[i]:gsub("^.-|r: ", "")) end
-  other:Hide(); follower:Hide(); wide:Hide(); offcol:Hide(); hostile:Hide(); secretRect:Hide(); M.flush()
+  SlashCmdList.FISHINGCOOKINGENCYCLOPEDIA("tab top")
+  say("Tab placement (top): " .. where() .. ", setting=" .. ns.db.settings.tabPosition)
+  SlashCmdList.FISHINGCOOKINGENCYCLOPEDIA("tab bottom")
+  say("Tab placement (bottom again): " .. where() .. ", setting=" .. ns.db.settings.tabPosition)
+  SlashCmdList.FISHINGCOOKINGENCYCLOPEDIA("tab sideways")
+  say("Invalid value keeps: " .. ns.db.settings.tabPosition)
 end)
 
 local fishing, cooking, prices = ns.UI.pages.fishing, ns.UI.pages.cooking, ns.UI.pages.prices
@@ -301,17 +299,23 @@ html = f'''<!doctype html><meta charset="utf-8"><title>FCE Lua check</title>
 <script src="https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js"></script>
 <script>
 const {{lua, lauxlib, lualib, to_luastring}} = fengari;
-const L = lauxlib.luaL_newstate(); lualib.luaL_openlibs(L);
-lua.lua_newtable(L);
-document.querySelectorAll('script[data-name]').forEach(s => {{
-  lua.lua_pushstring(L, to_luastring(s.textContent));
-  lua.lua_setfield(L, -2, to_luastring(s.dataset.name));
-}});
-lua.lua_setglobal(L, to_luastring("SRC"));
-{lua_list("TOC", files)}
-{lua_list("ALL", all_files)}
-const st = lauxlib.luaL_dostring(L, to_luastring(document.getElementById("driver").textContent));
-document.getElementById("out").textContent = (st === 0 ? "" : "DRIVER FAILED: ") + lua.lua_tojsstring(L, -1);
+function run(attFirst) {{
+  const L = lauxlib.luaL_newstate(); lualib.luaL_openlibs(L);
+  lua.lua_newtable(L);
+  document.querySelectorAll('script[data-name]').forEach(s => {{
+    lua.lua_pushstring(L, to_luastring(s.textContent));
+    lua.lua_setfield(L, -2, to_luastring(s.dataset.name));
+  }});
+  lua.lua_setglobal(L, to_luastring("SRC"));
+  lua.lua_pushboolean(L, attFirst); lua.lua_setglobal(L, to_luastring("ATT_FIRST"));
+  {lua_list("TOC", files)}
+  {lua_list("ALL", all_files)}
+  const st = lauxlib.luaL_dostring(L, to_luastring(document.getElementById("driver").textContent));
+  return (st === 0 ? "" : "DRIVER FAILED: ") + lua.lua_tojsstring(L, -1);
+}}
+document.getElementById("out").textContent =
+  "=== Load order 1: this addon creates the shared sidebar ===\\n" + run(false) +
+  "\\n\\n=== Load order 2: another addon created the sidebar first ===\\n" + run(true);
 </script>'''
 out.write_text(html, encoding="utf-8")
 print("wrote", out, "-", len(files), "addon files")
