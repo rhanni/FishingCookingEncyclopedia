@@ -2,8 +2,8 @@
 
 A World of Warcraft: Forever addon that adds an encyclopedia tab to the profession window.
 
-- **Fishing Waters:** zones grouped by the fishing skill they need, with their fish, pools and other catches. Each fish shows the cooking recipes it's used in and its auction house price.
-- **Cooking Recipes:** every recipe that uses fished ingredients, with where to buy it, what it costs, and what the dish gives you. Filter by known/unknown and by benefit.
+- **Fishing Waters:** zones grouped by the fishing skill they need, with their fish, pools and other catches. Each fish shows the cooking recipes it's used in and its auction house price. Search for a fish to see which zones it's caught in and the skill each needs.
+- **Cooking Recipes:** every recipe that uses fished ingredients, with where to buy it, what it costs, and what the dish gives you. Filter by known/unknown and by benefit; a line under the toolbar names the benefits being filtered on.
 - **Training:** where to train each rank of Fishing and Cooking, or buy the books, including quest start locations.
 - **Prices & Scan:** targeted auction house scanning for the raw fish and cooked dishes only, never the whole auction house.
 
