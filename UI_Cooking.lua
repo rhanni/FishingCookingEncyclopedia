@@ -10,6 +10,9 @@ local W = ns.Widgets
 local page = {}
 
 local VENDORS_SHOWN = 3
+local TOOLBAR_HEIGHT = 52     -- y of the filter line under the two toolbar rows
+local LIST_TOP = 54           -- list top when no benefit filter is active
+local LIST_TOP_FILTERED = 72  -- list top when the filter line is showing
 
 local function cookingRank()
 	return (ns.GetCookingSkill())
@@ -101,8 +104,18 @@ function page:Build(parent)
 	count:SetPoint("TOPRIGHT", -26, -6)
 	self.countText = count
 
+	-- Third toolbar line: names the benefits being filtered on (only while one is selected).
+	local filterText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	filterText:SetPoint("TOPLEFT", 8, -TOOLBAR_HEIGHT)
+	filterText:SetPoint("TOPRIGHT", -26, -TOOLBAR_HEIGHT)
+	filterText:SetJustifyH("LEFT")
+	filterText:SetWordWrap(false)
+	filterText:Hide()
+	self.filterText = filterText
+
 	local scroll = W.CreateScroll(f)
-	scroll:SetPoint("TOPLEFT", 0, -54)
+	scroll:SetPoint("TOPLEFT", 0, -LIST_TOP)
+	self.listTop = LIST_TOP
 	scroll:SetPoint("BOTTOMRIGHT", -24, 0)
 	scroll.onResize = function() if f:IsShown() then self:Refresh() end end
 	self.scroll = scroll
@@ -301,6 +314,30 @@ end
 function page:UpdateBenefitFilterText()
 	if self.setFilterText then self.setFilterText(self:BenefitFilterText()) end
 	if self.benefitPopup and self.benefitPopup:IsShown() then self:RefreshBenefitPopup() end
+	self:UpdateFilterLine()
+end
+
+-- Shows "Benefit filter (2): Attack Power, Spell Power" under the toolbar while
+-- any benefit is selected, and moves the list down to make room for it.
+function page:UpdateFilterLine()
+	if not self.filterText then return end
+	local names = {}
+	for _, b in ipairs(ns.Data:GetBenefitTypes()) do
+		if ns.db.settings.cookingBenefits[b.key] then names[#names + 1] = b.label end
+	end
+	local top = LIST_TOP
+	if #names > 0 then
+		self.filterText:SetText(("|cff9fb4ffBenefit filter (%d):|r |cffffffff%s|r"):format(#names, table.concat(names, ", ")))
+		self.filterText:Show()
+		top = LIST_TOP_FILTERED
+	else
+		self.filterText:SetText("")
+		self.filterText:Hide()
+	end
+	if self.listTop ~= top then
+		self.listTop = top
+		self.scroll:SetPoint("TOPLEFT", 0, -top)
+	end
 end
 
 -- Native filter dropdown (Blizzard menu system) when available, otherwise a

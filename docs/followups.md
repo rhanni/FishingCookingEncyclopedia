@@ -62,6 +62,9 @@ These were tested against a mock of the WoW API, never the real client.
 **Test tooling**
 - [ ] The offline checker uses Fengari, which is Lua 5.3; WoW runs Lua 5.1. Watch in-game for errors the checker can't catch.
 
+- [ ] **Fishing page search box:** it sits above the zone list and fits the list width. Searching a fish (try "salmon" or "whimsyfin") shows only zones that have it, each with the matching fish names and its skill number, and opens the first matching zone on the right. Clearing the search restores the tier groups and your collapsed/expanded state.
+- [ ] **Cooking page filter line:** with one or more benefits ticked, a line under the toolbar reads "Benefit filter (N): ..." and the recipe list moves down to make room. Check long selections (many benefits) are cut off cleanly and the list top does not overlap the line. It disappears when the filter is cleared.
+
 ## 2. Design assumptions and open decisions
 
 - [ ] **Cook / Sell verdict** compares the cooked price to the raw price only. It ignores vendor spice and water costs. Should it subtract them?

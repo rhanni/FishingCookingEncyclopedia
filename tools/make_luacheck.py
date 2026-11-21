@@ -126,6 +126,39 @@ step("fishing page", ns.UI.ShowPage, ns.UI, "fishing")
 say("Default zone for Fishing 240+25: " .. tostring(fishing.selected))
 renderAll("Before prices")
 
+step("fishing search", function()
+  ns.UI:ShowPage("fishing")
+  local function expected(q)
+    local n = 0
+    for _, z in ipairs(D.zones) do
+      local hit = false
+      for _, id in ipairs(z.fish or {}) do if D:GetItemName(id):lower():find(q, 1, true) then hit = true end end
+      for _, id in ipairs(z.extras or {}) do if D:GetItemName(id):lower():find(q, 1, true) then hit = true end end
+      for _, name in ipairs(z.pools or {}) do if name:lower():find(q, 1, true) then hit = true end end
+      if hit then n = n + 1 end
+    end
+    return n
+  end
+  local function search(q)
+    fishing.search:SetText(q)
+    fishing.search.__scripts.OnTextChanged(fishing.search)
+  end
+  local allRows = #fishing.zoneFlow.rows.used
+  say("Fishing search box exists: " .. tostring(fishing.search ~= nil) .. ", zone-list rows with no search: " .. allRows)
+  for _, q in ipairs({ "salmon", "Whimsyfin", "wreckage", "  SALMON  ", "zzzz" }) do
+    search(q)
+    local key = q:lower():match("^%s*(.-)%s*$")
+    local viaPage, selected = 0, nil
+    for _, z in ipairs(D.zones) do
+      if fishing:ZoneMatches(z) then viaPage = viaPage + 1 end
+      if z.name == fishing.selected then selected = z end
+    end
+    say(("Fish search '%s': %d zones expected, %d found, selected zone matches=%s, zone-list rows %d"):format(
+      key, expected(key), viaPage, tostring(selected ~= nil and fishing:ZoneMatches(selected) == true), #fishing.zoneFlow.rows.used))
+  end
+  search("")
+  say("Fish search cleared: zone-list rows " .. #fishing.zoneFlow.rows.used .. " (was " .. allRows .. " before searching)")
+end)
 step("search 'salmon'", function()
   cooking.search:SetText("salmon")
   cooking.search.__scripts.OnTextChanged(cooking.search)
@@ -185,8 +218,12 @@ step("cooking filters", function()
     if s.ap or s.spell then union = union + 1 end
   end
   say(("Ticked %s -> %d shown (expected union %d: AP %d + SP %d - both %d)"):format(table.concat(ticked, " + "), shown(), union, ap, sp, both))
+  say(("Filter line with benefits ticked: shown=%s, text='%s', list top=%s"):format(
+    tostring(cooking.filterText.__shown), cooking.filterText:GetText(), tostring(cooking.listTop)))
   menu.buttons[1].fn()
   say("After clear: " .. shown() .. " shown")
+  say(("Filter line after clear: shown=%s, text='%s', list top=%s"):format(
+    tostring(cooking.filterText.__shown), cooking.filterText:GetText(), tostring(cooking.listTop)))
 
   -- Unknown-only (mock knows only Brilliant Smallfish, spell 7751)
   M.click(cooking.unknownCheck); cooking.unknownCheck.__checked = true; M.click(cooking.unknownCheck)
